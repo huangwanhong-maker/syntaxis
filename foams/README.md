@@ -25,7 +25,7 @@
 
 ## 3. Checks
 
-`check_syntaxis_foams` (39):
+`check_syntaxis_foams` (40):
 - **A foam by hand.** Three buildings, a street and two junctions, with a birth, an alteration, two events on the street and censuses: 13 vertices, 21 segments and 10 lenses. Among its 11 events: 8 kinds of star, 7 rules, 3 matches and 5 contexts. κ = 0 at every event and 1 at each end, so Σκ = χ = 2. Its Foata steps have widths 3, 4, 2, 1, 1. Also held: its entropies by hand, the census at 5 per 61 building-years, its lives and their Re-Pair grammar with and without the censuses, and a readable account of its birth.
 - **Worldlines pinched.** Three participants passing through one event: κ = −2 there and Σκ = χ = −3.
 - **200 random records.** The cells counted from the stars equal the foam's. Every key is unchanged under renaming of the participants. The Foata steps equal morphe's causal order. Probabilities sum to one at every match and context. γ in closed form is no worse than any value of a fine grid.
@@ -35,6 +35,7 @@
 - **200 random nets.** Every event in one box of the top level; the wires inside the patterns and those left add up to the net's; each pattern derives as many events as its instances hold; the same patterns when the participants are renamed.
 - **Keys before the event.** The match and context of an event built from what it consumes equal those `stars` reads once it is there, on the hand foam and 200 random records with states.
 - **A planted record grown.** Twenty buildings altered at 0.2 a year, a building born at year 10, three streets taken by regimes at 3 a year lasting 0.02 years, and two of them by regimes of their own at one a year lasting half a year, overlapping the others: grown 100 times, the alterations and each site's regimes as many as the record's on average, every regime and its end alternating at each site though they overlap, regimes lasting as long, the birth in about 1 − e⁻² of the histories and its building altered only once born; every grown foam's χ = Σκ; the same stream, the same foam.
+- **A state an era never saw.** Regimes on three streets in the first ten of twenty years, the growth learned with a break at year 10: of 100 grown histories about a third carry a regime across the break, and each ends there at the window's rate; none is begun after the break, none left in force.
 - **Dominance and refusals.** The dominance order of three candidates on two measures; refusals.
 
 ## 4. Dependencies

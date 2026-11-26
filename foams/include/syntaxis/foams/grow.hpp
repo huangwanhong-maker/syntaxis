@@ -226,11 +226,23 @@ inline Growth learn_growth(const Foam& F, const std::vector<Star>& S, const std:
       if (g.once) hi = std::min(hi, F.time[g.example]);
       run(own[i], lo, hi);
     }
-    for (std::size_t k = 0; k < eras; k++)
+    // A state the site never stood in during an era leaves its rate there undetermined (no events over no time). The window's rate
+    // stands in, so that a site carried across an era's start in a state that era never saw goes on at the rate the record shows.
+    std::map<std::string, double> count_all, exposure_all;
+    for (std::size_t k = 0; k < eras; k++) {
+      for (const auto& [last, n] : g.rate[k]) count_all[last] += n;
+      for (const auto& [last, e] : exposure[k]) exposure_all[last] += e;
+    }
+    for (std::size_t k = 0; k < eras; k++) {
       for (auto& [last, n] : g.rate[k]) {
         const auto e = exposure[k].find(last);
         n = (e == exposure[k].end() || e->second <= 0) ? 0 : n / e->second;
       }
+      for (const auto& [last, e] : exposure_all) {
+        const auto here = exposure[k].find(last);
+        if ((here == exposure[k].end() || here->second <= 0) && e > 0 && count_all[last] > 0) g.rate[k][last] = count_all[last] / e;
+      }
+    }
   }
   return P;
 }

@@ -547,6 +547,49 @@ int main() {
     calx::random::Stream r1(9, 1, 1, 1), r2(9, 1, 1, 1);
     const auto g1 = grow(Fp, Sp, Pg, r1), g2 = grow(Fp, Sp, Pg, r2);
     s.require("... the same stream, the same foam", g1.vertex == g2.vertex && g1.time == g2.time);
+
+    // A state an era never saw: regimes on three streets begin at 3 a year and last 0.2 years in the first ten years only, the growth
+    // learned with a break at year 10. A regime grown across year 10 stands in a state the second era never saw, and ends there at
+    // the window's rate.
+    {
+      std::vector<Ev> ev2;
+      for (double t = 0;;) {
+        t += rs.exponential() / 3.0;
+        if (t + 0.2 >= 10) break;
+        ev2.push_back({t, "regime", {0, 1, 2}}), ev2.push_back({t + 0.2, "regime ended", {0, 1, 2}});
+        t += 0.2;
+      }
+      mt::Encounters E2;
+      E2.participants = 3;
+      std::vector<std::string> vk2 = {"start"};
+      std::vector<double> t2 = {0};
+      E2.present.push_back({0, 1, 2});
+      for (const auto& e : ev2) E2.present.push_back(e.who), vk2.push_back(e.kind), t2.push_back(e.t);
+      E2.present.push_back({0, 1, 2}), vk2.push_back("end"), t2.push_back(T);
+      std::vector<char> ends2(E2.present.size(), 0);
+      ends2.front() = ends2.back() = 1;
+      const auto F2 = make(E2, vk2, t2, ends2, std::vector<std::string>(3, "street"), {});
+      const auto S2 = stars(F2);
+      const auto P2 = learn_growth(F2, S2, {}, {10.0});
+      int crossed = 0, left = 0, late = 0;
+      for (int h = 0; h < H; h++) {
+        const auto Fg = grow(F2, S2, P2, rs);
+        double began = -1;
+        bool open = false;
+        for (std::size_t v = 1; v + 1 < Fg.size(); v++) {
+          if (Fg.vertex[v] == "regime") open = true, began = Fg.time[v], late += Fg.time[v] >= 10;
+          if (Fg.vertex[v] == "regime ended") {
+            crossed += began < 10 && Fg.time[v] >= 10;
+            open = false;
+          }
+        }
+        left += open;
+      }
+      s.require("a state an era never saw: of 100 histories, a regime grown across the era's start in about a third (15 to 60), each ended "
+                "at the window's rate; none begun after it, none left in force",
+                crossed >= 15 && crossed <= 60 && left == 0 && late == 0,
+                std::to_string(crossed) + " crossed, " + std::to_string(left) + " left in force, " + std::to_string(late) + " begun late");
+    }
   }
 
   // ---- Dominance and refusals ---------------------------------------------------------------------------------------------------
