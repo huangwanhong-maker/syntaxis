@@ -4,5 +4,5 @@ What is new in syntaxis, one file per day of commits, newest first. Each commit 
 
 | Day | Sections |
 |---|---|
-| [2026-11-26](2026-11-26.md) | Grammars whose words are foams; patterns across worldlines and foams grown from their grammar; each site of a growth reads its own states |
+| [2026-11-26](2026-11-26.md) | Grammars whose words are foams; patterns across worldlines and foams grown from their grammar; each site of a growth reads its own states; a site remembers its last production |
 | [2026-11-08](2026-11-08.md) | syntaxis founded: grammars whose words are geometric |

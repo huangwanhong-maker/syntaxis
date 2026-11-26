@@ -1,6 +1,6 @@
 # 0006. Sites as Automata
 
-- **Status:** Accepted, provisionally (2026-11-26). Amends decision 0005, §2.2.
+- **Status:** Accepted, provisionally (2026-11-26). Amends decision 0005, §2.2; §2.1 to §2.3 amended by [decision 0007](0007-a-sites-state-is-its-last-production.md).
 - **Date:** 2026-11-26
 - **Decided by:** the growth of decision 0005 checked against a city's record, which showed it wrong where sites overlap (the infrastructure's ADR 0171).
 
