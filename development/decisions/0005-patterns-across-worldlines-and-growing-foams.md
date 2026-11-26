@@ -2,7 +2,7 @@
 
 - **Status:** Accepted, provisionally (2026-11-26).
 - **Date:** 2026-11-26
-- **Decided by:** the infrastructure's user, who asked for the three things decision 0004 left unbuilt: patterns spanning several worldlines found from the complex itself, a generator that grows a foam from its grammar, and a second city's record read the same way (the infrastructure's ADR 0169).
+- **Decided by:** the infrastructure's user, who asked for the three things decision 0004 left unbuilt: patterns spanning several worldlines found from the complex itself, a generator that grows a foam from its grammar, and a second city's record read the same way (the infrastructure's ADR 0171).
 
 ## 1. Context
 
@@ -23,5 +23,5 @@ Decision 0004's lives compress each participant's worldline alone, so a pattern 
 ## 4. Consequences
 
 - `check_syntaxis_foams`, 39 checks; syntaxis 109.
-- The infrastructure's urban science finds the patterns of a city's changes and grows its histories from its grammar (its ADR 0169).
+- The infrastructure's urban science finds the patterns of a city's changes and grows its histories from its grammar (its ADR 0171).
 - Not built: patterns of more than two boxes chosen at once; sites of several participants that no record shows.
