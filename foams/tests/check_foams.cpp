@@ -547,6 +547,23 @@ int main() {
     calx::random::Stream r1(9, 1, 1, 1), r2(9, 1, 1, 1);
     const auto g1 = grow(Fp, Sp, Pg, r1), g2 = grow(Fp, Sp, Pg, r2);
     s.require("... the same stream, the same foam", g1.vertex == g2.vertex && g1.time == g2.time);
+    // The table of what followed, read as a function: with whether a regime is in force, an end where the two sites overlap leaves the
+    // first two streets under a regime or free as the other site stands; with how many are in force, each state out follows.
+    auto Fn = Fp;
+    for (std::size_t x = 0; x < 3; x++) {
+      int open = 0;
+      for (auto v : Fn.W.worldline[x]) {
+        if (ends[v]) continue;
+        Fn.states[x][v] = open > 0 ? std::to_string(open) : "";
+        if (vk[v] == "regime") open++;
+        if (vk[v] == "regime ended") open--;
+      }
+    }
+    const auto Pn = learn_growth(Fn, stars(Fn));
+    s.require("... the table of what followed: with whether a regime is in force, some states out other than its commonest; with how many, none",
+              Pg.unsure().first > 0 && Pn.unsure().first == 0 && Pn.unsure().second == Pg.unsure().second,
+              std::to_string(Pg.unsure().first) + " of " + std::to_string(Pg.unsure().second) + "; " + std::to_string(Pn.unsure().first) + " of " +
+                  std::to_string(Pn.unsure().second));
 
     // A state an era never saw: regimes on three streets begin at 3 a year and last 0.2 years in the first ten years only, the growth
     // learned with a break at year 10. A regime grown across year 10 stands in a state the second era never saw, and ends there at

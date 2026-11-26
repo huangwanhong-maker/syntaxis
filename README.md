@@ -33,7 +33,7 @@ A method belongs here when it is a grammar over geometric or topological objects
 
 ## 3. Checks
 
-`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 110 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; twenty derivations of triangles recovered by the analyser from their leaves alone; a foam worked by hand, with χ = Σκ on 200 random records; and a context planted in events, found by the context-sensitive grammar and by no other.
+`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 111 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; twenty derivations of triangles recovered by the analyser from their leaves alone; a foam worked by hand, with χ = Σκ on 200 random records; and a context planted in events, found by the context-sensitive grammar and by no other.
 
 ## 4. Dependencies
 

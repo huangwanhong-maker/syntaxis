@@ -92,6 +92,18 @@ struct Growth {
   Grammar grammar;                                   // the record's, its contexts keyed by the states the participants carry
   std::set<std::string> left_out;                    // kinds of event the growth leaves out
   std::size_t era(double t) const { return static_cast<std::size_t>(std::upper_bound(breaks.begin(), breaks.end(), t) - breaks.begin()); }
+  // How far the table is from a function: of its transitions, those whose state out is not the commonest for their state in, rule
+  // and place, and all of them. Nought of them when every state out follows from the state in, the rule and the place, as the
+  // growth assumes; more, when the states are too coarse for the record (whether any hold is in force, where holds overlap).
+  std::pair<std::size_t, std::size_t> unsure() const {
+    std::size_t all = 0, other = 0;
+    for (const auto& [key, outs] : after) {
+      std::size_t n = 0, most = 0;
+      for (const auto& [k, c] : outs) n += c, most = std::max(most, c);
+      all += n, other += n - most;
+    }
+    return {other, all};
+  }
   // The state a participant carries out of an event: the table's commonest for the state carried in, the rule and the place.
   std::string step(const std::string& in, const std::string& rule, const std::string& place) const {
     const auto it = after.find({in, rule, place});
