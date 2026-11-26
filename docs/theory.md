@@ -169,10 +169,90 @@ The analyser of the replacement grammar works from the leaves alone, bottom up (
 
 The parent is accepted when every child of the move is among the current triangles, compared by their vertices to a tolerance. It then replaces them. Where Sierpinski's three corners are found and the midpoint move's medial triangle is present too, the midpoint is taken. Every hypothesis determines its parent and its move, so an accepted group has one reading. The analysis ends with one root when the leaves came from one derivation. The check recovers the root and the count of each move from the leaves of twenty random derivations.
 
-## 7. Placement in the Infrastructure
+## 7. Words of Dimension Two in Time: Foams
+
+*Module `foams` (decision 0004).*
+
+The words of §6 are triangles in the plane. A record of events in time makes a 2-complex of another kind, abstract and typed, whose cells are generated one event at a time: a foam. Its grammar reads each event as a production, which attaches one vertex with its star.
+
+### 7.1 Foams and Their Stars
+
+**Definition 7.1 (foam).** A *record of encounters* (morphe's `Encounters`) gives a sequence of events in time, the participants present at each, and pairs of participants with the events at which they meet. Its *worldline complex* $W$ (morphe's `worldline_complex`) has the events as vertices, the *segments* as edges (each participant between two consecutive events it attends) and the *lenses* as 2-cells (each pair between two consecutive meetings, attached along both participants' worldlines between them). A *foam* is $W$ with a kind for each vertex, each participant and each pair, a time for each vertex, nondecreasing in its order, and optionally a state for each participant from a vertex on. The state given at $v$ is the one $v$'s context sees, so a state meant to inform a prediction of the event at $v$ is the one carried into it, never one the event sets. The first and the last vertex may be marked as the *moments at the ends* $\partial_0, \partial_1$ of a record's window, at which every participant then alive is present.
+
+**Definition 7.2 (star).** The *star* of a vertex $v$ is:
+- its kind;
+- each participant $x$ present at $v$ with its *role*: *through* if a segment of $x$ arrives at $v$ and one leaves, *begins* if only one leaves, *ends* if only one arrives, *instant* if neither;
+- its *corners*: a lens of the pair $\{a, b\}$ whose first meeting is $v$ *opens* between $a$ and $b$; one whose last meeting is $v$ *closes* between them; one that runs past $v$ along $a$'s worldline *passes* on $a$.
+
+Write $\mathrm{ends}(v)$ for the number of arriving and leaving segments, and $\mathrm{opens}(v)$, $\mathrm{closes}(v)$ for its open and close corners. The *curvature* of $v$ is
+$$\kappa(v) = 1 - \tfrac12\,\mathrm{ends}(v) + \tfrac12\big(\mathrm{opens}(v) + \mathrm{closes}(v)\big).$$
+
+**Proposition 7.1 (local Euler characteristic).** For every foam, $\chi = V - E + F = \sum_v \kappa(v)$.
+
+*Proof.* A segment of $x$ from $u$ to $w$ is a leaving end at $u$ and an arriving end at $w$; conversely a leaving end of $x$ at $v$ exists exactly when $v$ is not the last vertex of $x$'s worldline, and is then the segment to $x$'s next vertex, and likewise for arriving ends. So $\sum_v \mathrm{ends}(v) = 2E$. A lens has exactly one first and one last meeting, so $\sum_v \mathrm{opens}(v) = \sum_v \mathrm{closes}(v) = F$. Summing $\kappa$ gives $V - E + F$. ∎
+
+*Remark.* An event that touches one participant and opens or closes no lens has $\kappa = 0$: such events (an observation of one building) can be added to or removed from a record without changing $\chi$. An event at which $n$ participants pass through with no corner has $\kappa = 1 - n$: it pinches $n$ worldlines at one vertex.
+
+Four keys are read from a star, each the canonical form of a labelled multigraph (morphe's `canonical_form`): a node for the event, one for each participant joined to it, an edge between two participants for an open or close corner, a loop for a pass.
+- The *star key* holds everything, with the participants' states.
+- The *rule* is the event's action: its kind, the participants' kinds and roles, the open and close corners.
+- The *match* is what the event consumes: the participants with an arriving end, by kind, and the close corners among them.
+- The *context* is the match with those participants' states and passes.
+
+Two stars have equal keys exactly when the structures they encode are isomorphic, where the canonical form is exact (`Star::exact`).
+
+### 7.2 Productions and the Sweep
+
+A star is a production on the *network of the moment*: the participants alive between two events, and the lenses open between them. Its left side is the match: the participants it consumes and the lenses it closes. Its right side is what it leaves: the participants that go on or begin, and the lenses it opens. The participants that go on are its interface. Read in time, a foam is a derivation: the sweep of its events, each attaching one vertex with its star to the open ends of the moment. This is the event operator of the infrastructure's design of event spacetime, whose Definition 4.8 attaches an event's vertex with its link; Proposition 7.1 counts the cells of the result from the stars alone (`foams::replay`).
+
+**Proposition 7.2 (commutation).** If two events consecutive in time share no participant, exchanging them gives an isomorphic foam with the same stars.
+
+*Proof.* Each participant's worldline, the sequence of the events it attends, is unchanged, and so is each pair's sequence of meetings. Segments, lenses and corners correspond one to one. ∎
+
+The order of a foam's events is therefore a linearisation of a trace (Mazurkiewicz 1977; Diekert and Rozenberg 1995): two events are ordered when a worldline runs from one to the other. The *Foata steps* (Cartier and Foata 1969) cut the events into levels of pairwise independent events. An event's step is one more than the latest step of an event before it on one of its worldlines (`foams::steps`), equal to morphe's `causal_order` of the trace, which the checks hold on random records.
+
+### 7.3 The Stochastic Grammar
+
+A grammar learned from a set of events counts their rules, and each rule with its match and its context (`foams::learn`). The probability of a rule $r$ is read at three levels, each a hierarchical Dirichlet backoff to the one before (MacKay and Peto 1995):
+$$P_0(r) = \frac{n(r)}{N + \gamma}\ \ (r \text{ seen}),\qquad P_0(\text{new}) = \frac{\gamma}{N + \gamma},$$
+$$P_1(r \mid m) = \frac{n(m, r) + \alpha_1 P_0(r)}{n(m) + \alpha_1},\qquad P_2(r \mid c) = \frac{n(c, r) + \alpha_2 P_1(r \mid m)}{n(c) + \alpha_2},$$
+with $m$ the match of the context $c$. An unseen rule reads as the one outcome "new".
+
+**Proposition 7.3.** At every match $m$ and every context $c$, seen or not, $P_1(\cdot \mid m)$ and $P_2(\cdot \mid c)$ are probability distributions on the rules seen and "new".
+
+*Proof.* $\sum_r P_0(r) = N/(N + \gamma)$ over the seen rules, and $P_0(\text{new}) = \gamma/(N + \gamma)$, so $P_0$ sums to one. Then $\sum_r \big(n(m, r) + \alpha_1 P_0(r)\big) = n(m) + \alpha_1$ over the seen rules and "new", since $n(m, \text{new}) = 0$. The same holds for $P_2$ with $P_1$ in place of $P_0$. ∎
+
+**Proposition 7.4 (the escape by leave-one-out).** Let $S$ be the number of rules seen once among $N \ge 2$ events, $0 < S < N$. Leaving each event out in turn, $\sum_i \log P_0^{(-i)}(r_i)$ is maximised at $\gamma = S(N - 1)/(N - S)$.
+
+*Proof.* With one event of rule $r$ left out, $P_0^{(-i)}(r) = (n(r) - 1)/(N - 1 + \gamma)$ if $n(r) \ge 2$, and $\gamma/(N - 1 + \gamma)$ if $r$ was seen once, for it is then new. The sum is $\sum_{n(r) \ge 2} n(r) \log(n(r) - 1) + S \log \gamma - N \log(N - 1 + \gamma)$, whose derivative $S/\gamma - N/(N - 1 + \gamma)$ is positive below and negative above the stated value. ∎
+
+$\alpha_1$ and $\alpha_2$ are chosen likewise by leave-one-out, over a grid of 121 values from $10^{-3}$ to $10^3$, each event left out of every count it enters.
+
+*Caveat.* A rule determines its match: the participants it consumes and the lenses it closes are part of it. So $I(R; M) = H(M)$, and level 0 predicts what an event touches as well as what it does. Levels 1 and 2 predict the same thing, an event's action given what it consumes. Level 1 is the *context-free* grammar, a production depending on its left side alone; level 2 is the *context-sensitive* one. Their difference is the test.
+
+### 7.4 Judging a Grammar
+
+A grammar is judged on events it did not learn from by their mean $-\log_2 P$, in bits per event (`foams::held_out`), with the share of those events whose rule, match and context it saw. Where a record's sources change in time, a split by date is confounded: a source that begins after the date brings rules that the grammar learned before it never saw, and the test then measures the source's arrival. The *prequential* judgement (Dawid 1984, *J. R. Stat. Soc. A* 147) prices each event, in the order of time, by the grammar of every event before it, and then counts it; the escape and the concentrations are chosen again by leave-one-out at given times (`foams::prequential`). The sum of $-\log_2 P$ is the length of a prequential code for the record's rules in the sense of the minimum description length (Grünwald 2007, *The Minimum Description Length Principle*, MIT Press). A new rule is charged once, at its first appearance, the same at every level, and the levels then differ in how they price what is known. With few events, leave-one-out takes the concentrations to the ends of their grid, and the first surprises in a context the grammar has only seen settled are priced dearly. Several grammars of one record, judged on several measures (bits in each era, the counts each reads), are compared as a partial order by dominance (`foams::dominance`). One lies above another when it is at least as good on every measure and better on one, after the author's inquiry into evidence-based partial orders (Huang 2026, doi:10.17613/73180-mhn03). No single score is formed. Plug-in entropies on the events learned from (`foams::entropies`) describe the record, among them $H(R \mid M)$ and $H(R \mid M) - H(R \mid C)$. They are biased low where contexts are many (§6.2's caveat); the held-out bits are the test.
+
+The rates of the rules (the couplings of the design's field theory, its §6.2) are their counts over the time the participants they consume were alive (`foams::exposure`, `foams::rates`): a rule applied to one participant of a kind, per unit of that kind's alive time; a rule that consumes nothing, per unit of the record's span. A match of several participants has no exposure counted here.
+
+### 7.5 Lives
+
+A participant's worldline passes through the events it attends; their rules, each with the participant's place in it, form a word, its *life* (`foams::lives`). Events on one worldline are ordered in the trace, and the causal order is generated by the worldlines' orders, so the record's trace is determined by the lives together with the stars that join them. The lives are compressed by Re-Pair (morphe's `repair`, its decision 0022). Each rule of the straight-line grammar is a pattern of consecutive events that recurs in lives, nested; its uses count how often the derivation of all lives spends it. Every life is recovered exactly from the grammar. Events of chosen kinds that only pass (an observation of one participant) may be left out of the words, to read the lives of changes alone.
+
+*Remark.* A grammar together with its derivation (the rule at each vertex, the lives' straight-line grammar) is a compact form of its record that reproduces it: the cells by Proposition 7.1, the lives by expansion. It is an archival carrier in the sense of the author's discussion of archival representation and generative inheritance (Huang 2026, doi:10.17613/9g6zv-df566), whose criterion of reproduction is exact replay.
+
+### 7.6 Relation to Other Grammars
+
+- **The gluing grammar (§6.2).** It glues triangles along edges, with letters by shape. A foam's grammar glues stars along segments and lenses, with letters by combinatorial type.
+- **Hyperedge replacement.** The author's draft of grammars of records replaces nonterminal cells attached to boundary events. A rule of Re-Pair over lives is such a nonterminal, restricted to one worldline. Nonterminals that span several worldlines, found by compressing the foam itself, are planned.
+- **The field theory of events.** In the infrastructure's design, each event type is one interaction vertex, whose bubble is the event's link. The rules learned here are those vertices, read from a record, and their rates are the couplings.
+
+## 8. Placement in the Infrastructure
 
 The grammars name no object in nature, which is why they are a foundation. The infrastructure's domains supply the objects:
 - urban science, a street network as a geometric graph and its blocks as faces;
-- architecture, footprints as polygons and plans as outlines.
+- architecture, footprints as polygons and plans as outlines;
+- urban science again, a city's record of events as a foam (decision 0004).
 
 Chemistry's molecular graphs and the cell complexes of districts are next (decision 0003). Hyperedge replacement (Remark 3.4), grammars on 3-complexes whose words are tetrahedra, and an exact parser (§5) are planned there.

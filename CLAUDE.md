@@ -13,12 +13,13 @@ syntaxis implements grammars whose words are geometric or topological objects, a
 - their probabilistic and context-sensitive forms, and sampling from them;
 - syntax analysis: a structure parsed by a grammar into a derivation forest;
 - grammars whose words are 2-simplices: gluing and replacement, with their analysers;
+- grammars whose words are foams, typed 2-complexes swept in time: their stars as productions, their grammar learned and judged, and the lives of their participants compressed;
 - later, hyperedge replacement, exact parsing, and grammars on 3-complexes.
 
 It builds on three sibling libraries:
 
 - **calx**, for random streams;
-- **morphe**, as the siblings' order requires (and later, for its formal languages and graph rewriting);
+- **morphe**, for worldline complexes, canonical forms of labelled graphs and Re-Pair (and later, for its graph rewriting);
 - **physis**, for segments, plane faces of plane graphs and the constrained Delaunay triangulation of polygons.
 
 Out of scope:
@@ -54,14 +55,14 @@ syntaxis shares its governing principle with its sibling repositories: **modular
   - `draft`: being worked out;
   - `stable`: tested and relied upon;
   - `deprecated`: superseded, with a pointer to its replacement.
-- **One structure.** A grammar is a set of productions on words of some geometry. Learning, derivation and analysis are written once for that structure, and each kind of word (graph, 2-complex) supplies its patterns and its keys.
+- **One structure.** A grammar is a set of productions on words of some geometry. Learning, derivation and analysis are written once for that structure, and each kind of word (graph, 2-complex, foam) supplies its patterns and its keys.
 
 ## 4. Repository Layout
 
 ```
 syntaxis/
 ├── CMakeLists.txt   the project: one header-only target syntaxis::<module> per module (syntaxis_module); the siblings added once
-├── shape/ · graphs/ · induction/ · derivation/ · parsing/ · stochastic/ · simplicial/
+├── shape/ · graphs/ · induction/ · derivation/ · parsing/ · stochastic/ · simplicial/ · foams/
 ├── docs/            the theory note
 └── development/     decisions · ideas · release notes
 ```

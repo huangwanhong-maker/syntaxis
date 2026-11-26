@@ -1,6 +1,6 @@
 # syntaxis
 
-*σύνταξις, an arranging together; whence "syntax".* syntaxis holds grammars whose words are geometric: graphs in the plane whose patterns repeat up to rotation, scale and position, and 2-complexes whose letters are triangles. It learns such grammars from structures by compression, makes them probabilistic and context-sensitive, derives new structures from them, and parses structures by them, recording every derivation and parse. It is a foundation library of [Noetarium, the Science and Humanity Infrastructure](https://github.com/huangwanhong-maker/Noetarium-The-Science-and-Humanity-Infrastructure), and makes sense without it. Status: **draft** (2026-11-08).
+*σύνταξις, an arranging together; whence "syntax".* syntaxis holds grammars whose words are geometric: graphs in the plane whose patterns repeat up to rotation, scale and position, 2-complexes whose letters are triangles, and foams, typed 2-complexes swept in time whose letters are the stars of their events. It learns such grammars from structures by compression, makes them probabilistic and context-sensitive, derives new structures from them, and parses structures by them, recording every derivation and parse. It is a foundation library of [Noetarium, the Science and Humanity Infrastructure](https://github.com/huangwanhong-maker/Noetarium-The-Science-and-Humanity-Infrastructure), and makes sense without it. Status: **draft** (2026-11-08; foams 2026-11-26).
 
 ## 1. Concepts
 
@@ -11,6 +11,7 @@ A string grammar rewrites letters standing in a line. Here the letters stand in 
 - **The hierarchy.** Rules of the same shape are merged into categories, which makes them recursive on self-similar input. Weighted by their use, they form a PCFG; conditioned on their parent's category, and refusing to cross what is drawn, a PCSG (§4).
 - **Syntax analysis.** A structure is parsed by a grammar into a forest that says which rules derive which parts. The parse is invariant under similarity: a turned and scaled copy parses as the original (§5).
 - **2-simplices as words.** A triangle's shape class is a letter. A 2-complex is a text, read by a gluing grammar (which letters are glued to which edges, with its entropies) or by a replacement grammar (a triangle rewritten by Pachner's, the midpoint's or Sierpinski's move), whose derivations the analyser recovers from the final triangles alone (§6).
+- **Foams.** A record of events in time makes a typed 2-complex, the worldline complex of its participants, generated one event at a time. Each event is a production whose word is its star: what it consumes, what it leaves and the lenses it opens and closes. Its grammar is learned at three levels (a rule alone, given what it consumes, given also its context), judged on events it has not yet seen, and the participants' lives are compressed into a straight-line grammar (§7).
 
 A method belongs here when it is a grammar over geometric or topological objects, or its learning, derivation or analysis. What it is a grammar *of*, such as streets, buildings or molecules, belongs to the domains ([decision 0002](development/decisions/0002-scope-boundaries-and-dependencies.md)).
 
@@ -25,17 +26,18 @@ A method belongs here when it is a grammar over geometric or topological objects
 | [parsing](parsing/README.md) | The syntax analyser: a graph parsed by a grammar into a forest, with coverage and whether it is derived | draft |
 | [stochastic](stochastic/README.md) | Categories by shape, the PCFG by relative frequency, the PCSG by parent annotation and a non-crossing condition; sampling and its statistics | draft |
 | [simplicial](simplicial/README.md) | 2-complexes from polygons and plane graphs; letters; the gluing grammar with its entropies and conditioned growth; the replacement grammar and its analyser | draft |
+| [foams](foams/README.md) | Foams and their stars (roles, corners, curvature summing to χ, four canonical keys); the Foata steps of a record's trace; the stochastic grammar by hierarchical Dirichlet backoff, judged held out and prequentially, compared by dominance; rates per exposure; the participants' lives compressed by Re-Pair | draft |
 | hyperedge | Hyperedge-replacement grammars, which share nodes between copies (Sierpinski's gasket), and their parsing | planned |
 | exact | An exact parser for small inputs by backtracking over the greedy analyser's choices | planned |
 | solid | Grammars on 3-complexes whose words are tetrahedra | planned |
 
 ## 3. Checks
 
-`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 70 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; and twenty derivations of triangles recovered by the analyser from their leaves alone.
+`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 95 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; twenty derivations of triangles recovered by the analyser from their leaves alone; a foam worked by hand, with χ = Σκ on 200 random records; and a context planted in events, found by the context-sensitive grammar and by no other.
 
 ## 4. Dependencies
 
-calx (random streams), morphe (as the siblings' order requires) and physis (segments and their crossings, plane faces of plane graphs, the constrained Delaunay triangulation of polygons). Header-only C++20.
+calx (random streams), morphe (worldline complexes, canonical forms of labelled graphs, Re-Pair) and physis (segments and their crossings, plane faces of plane graphs, the constrained Delaunay triangulation of polygons). Header-only C++20.
 
 ## 5. Licence
 

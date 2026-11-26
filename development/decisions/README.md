@@ -12,6 +12,7 @@ Each record captures one decision that shapes the structure, interfaces or tooli
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-scope-boundaries-and-dependencies.md) | Scope, boundaries and dependencies: grammars whose words are geometric | Accepted |
 | [0003](0003-the-first-modules.md) | The first modules | Accepted, provisionally |
+| [0004](0004-grammars-whose-words-are-foams.md) | Grammars whose words are foams: stars as productions, their keys and curvature, the grammar by backoff judged held out and prequentially, lives by Re-Pair | Accepted, provisionally |
 
 ## 2. Template
 
