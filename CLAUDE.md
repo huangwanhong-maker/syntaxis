@@ -13,7 +13,7 @@ syntaxis implements grammars whose words are geometric or topological objects, a
 - their probabilistic and context-sensitive forms, and sampling from them;
 - syntax analysis: a structure parsed by a grammar into a derivation forest;
 - grammars whose words are 2-simplices: gluing and replacement, with their analysers;
-- grammars whose words are foams, typed 2-complexes swept in time: their stars as productions, their grammar learned and judged, and the lives of their participants compressed;
+- grammars whose words are foams, typed 2-complexes swept in time: their stars as productions, their grammar learned and judged, the lives of their participants compressed, their patterns across worldlines found by compressing their process nets, and foams grown from their grammar;
 - later, hyperedge replacement, exact parsing, and grammars on 3-complexes.
 
 It builds on three sibling libraries:

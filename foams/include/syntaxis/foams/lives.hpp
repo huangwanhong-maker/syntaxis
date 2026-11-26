@@ -73,22 +73,24 @@ inline bool passes_only(const Star& s) {
   return true;
 }
 
+// A participant's place in a star (the i-th present): its kind, its role and the corners it opens or closes, with the partner's kind.
+inline std::string place_of(const Foam& F, const Star& s, std::size_t i) {
+  std::vector<std::string> cs;
+  for (const auto& c : s.corners) {
+    if (c.kind == Corner::pass || (c.a != i && c.b != i)) continue;
+    const std::size_t other = c.a == i ? c.b : c.a;
+    cs.push_back(std::string(c.kind == Corner::open ? "opens " : "closes ") + F.pair[F.W.lenses[c.lens].pair] + " with " + F.participant[s.participants[other]]);
+  }
+  std::sort(cs.begin(), cs.end());
+  std::string out = F.participant[s.participants[i]] + " " + role(s.in[i], s.out[i]);
+  for (const auto& c : cs) out += ", " + c;
+  return out;
+}
+
 // The lives of every participant, or of those of one kind (`only`, empty for all).
 inline Lives lives(const Foam& F, const std::vector<Star>& S, const std::set<std::string>& left_out_kinds = {}, const std::string& only = {}) {
   Lives L;
-  // The participant's place in a star: its kind, its role and the corners it opens or closes, with the partner's kind.
-  const auto place = [&](const Star& s, std::size_t i) {
-    std::vector<std::string> cs;
-    for (const auto& c : s.corners) {
-      if (c.kind == Corner::pass || (c.a != i && c.b != i)) continue;
-      const std::size_t other = c.a == i ? c.b : c.a;
-      cs.push_back(std::string(c.kind == Corner::open ? "opens " : "closes ") + F.pair[F.W.lenses[c.lens].pair] + " with " + F.participant[s.participants[other]]);
-    }
-    std::sort(cs.begin(), cs.end());
-    std::string out = F.participant[s.participants[i]] + " " + role(s.in[i], s.out[i]);
-    for (const auto& c : cs) out += ", " + c;
-    return out;
-  };
+  const auto place = [&](const Star& s, std::size_t i) { return place_of(F, s, i); };
   // Collect the symbols first, to number them in the order of their keys.
   std::vector<std::vector<std::pair<std::string, std::string>>> raw(F.participant.size());  // participant ↦ (key, name) in time
   for (std::size_t x = 0; x < F.participant.size(); x++)

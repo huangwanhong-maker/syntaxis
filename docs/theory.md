@@ -242,10 +242,40 @@ A participant's worldline passes through the events it attends; their rules, eac
 
 *Remark.* A grammar together with its derivation (the rule at each vertex, the lives' straight-line grammar) is a compact form of its record that reproduces it: the cells by Proposition 7.1, the lives by expansion. It is an archival carrier in the sense of the author's discussion of archival representation and generative inheritance (Huang 2026, doi:10.17613/9g6zv-df566), whose criterion of reproduction is exact replay.
 
-### 7.6 Relation to Other Grammars
+### 7.6 Patterns across Worldlines
+
+The lives see the record one worldline at a time. The foam itself is read as a process (`foams::net`). Each event is a *box* labelled by its rule, with an *in-port* for each participant it consumes and an *out-port* for each it leaves. Each segment is a *wire* from the out-port of the event it leaves to the in-port of the next event on the same worldline. A port is named by its *signature*, the participant's kind and place in its event. Events of chosen kinds that only pass may be left out first, their wires joined across them (Proposition 7.1's remark: they refine their worldlines). The wires are the dependences of the record's trace, so the net is the trace as a process, in the sense of the processes of Petri nets.
+
+**Definition 7.3 (digram).** A *digram* is two boxes joined by at least one wire, the first the one whose first event is earlier. Its *type* is the pair of labels and the multiset of its wires, each by its direction and the signatures of the ports it joins.
+
+The net is compressed as Re-Pair compresses words (`foams::compress`; Larsson and Moffat 2000), in the way gRePair compresses hypergraphs (Maneth and Peternek 2018, *Information Systems* 76). The type with the most occurrences that share no box, two at least, becomes a new label, a *pattern*. Its occurrences are chosen greedily in the order of time. The pattern's ports are the two boxes' ports not wired between them, each signature prefixed by the part it comes from, and each chosen occurrence is replaced by one box of the pattern. The step is repeated until no type occurs twice.
+
+**Proposition 7.5.** After compression, every event kept lies in exactly one box of the top level; the wires inside the patterns' instances and the wires left between boxes add up to the net's; and each pattern derives, through its parts, as many events as each of its instances holds.
+
+*Proof.* A contraction replaces two disjoint boxes by one whose events are their union, so the boxes stay a partition of the events. It removes exactly the wires between the two, which are the pattern's own wires, and re-points every other wire of either box to the new one. A pattern's derivation is its parts' derivations joined, and so is each instance's set of events. ∎
+
+A pattern's instances bind the worldlines that run through them. A pattern of two participants or more is a part of the record that recurs across worldlines, found from the foam itself and from no single worldline's word.
+
+*Caveat.* A type is exact up to the symmetries of its boxes. Two occurrences of one type are isomorphic as wired pairs when the ports of one signature are interchangeable within their box, as they are in every star with no corner between two participants and in every pattern made of such stars. The greedy choice of occurrences, like Re-Pair's, gives a small grammar, not the smallest.
+
+### 7.7 Growing Foams
+
+A foam is grown one event at a time by the event operator (`foams::learn_growth`, `foams::grow`). At each step a *site* is chosen, the grammar chooses the event's rule among those that fit the site, and the event's vertex is attached there with its star. A site is one of two kinds:
+- *generic*: any one participant of a kind, for an event that touches one participant passing through and opens or closes no lens;
+- *concrete*: the participants and pairs of an event the record holds, with those it begins. A site that begins a participant happens once.
+
+A site's *condition* is the set of states its participants carry. Its rate in each condition and each era of the window is the number of the record's events there in that condition and era, over the time it spent so: a rate per exposure, which is the rate's maximum likelihood for a Poisson process at that site. The rule is drawn from $P_2(r \mid c)$, the grammar's context-sensitive probability given the context $c$ the event would have, renormalised over the rules whose *shape* (the rule's key with the event's kind left out) is the site's. The context is built from what the event would consume (`foams::match_and_context`) as `stars` builds it, so that an event not yet in a foam is keyed as it will be once there.
+
+The states are attributes the productions update (Knuth 1968). The state a participant carries out of an event is drawn from the record's table of what followed that state, rule and place, and kept where the table is silent. The process is a continuous-time Markov chain on the attributed network of the moment. It is simulated by Gillespie's direct method (1977) on a calx stream, restarted at each era's end since the chain is memoryless.
+
+*Remark.* Grown histories are a check of the grammar. Each is measured as the record is: its events by kind and year, $\chi$, the depth of its trace, its prequential code, how far its lives and its net compress. Where the record lies outside its grown histories, the grammar does not hold what made it so.
+
+*Caveat.* The process grows no site the record never shows for more than one participant. It holds no time beyond the rates of its eras, and it changes no state through an event it leaves out.
+
+### 7.8 Relation to Other Grammars
 
 - **The gluing grammar (§6.2).** It glues triangles along edges, with letters by shape. A foam's grammar glues stars along segments and lenses, with letters by combinatorial type.
-- **Hyperedge replacement.** The author's draft of grammars of records replaces nonterminal cells attached to boundary events. A rule of Re-Pair over lives is such a nonterminal, restricted to one worldline. Nonterminals that span several worldlines, found by compressing the foam itself, are planned.
+- **Hyperedge replacement.** The author's draft of grammars of records replaces nonterminal cells attached to boundary events. A rule of Re-Pair over lives is such a nonterminal, restricted to one worldline; a pattern of the net (§7.6) is one that spans several, a two-box hyperedge rule, nested.
 - **The field theory of events.** In the infrastructure's design, each event type is one interaction vertex, whose bubble is the event's link. The rules learned here are those vertices, read from a record, and their rates are the couplings.
 
 ## 8. Placement in the Infrastructure

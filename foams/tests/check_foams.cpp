@@ -23,6 +23,8 @@
 #include <syntaxis/foams/foams.hpp>
 #include <syntaxis/foams/grammar.hpp>
 #include <syntaxis/foams/lives.hpp>
+#include <syntaxis/foams/grow.hpp>
+#include <syntaxis/foams/nets.hpp>
 
 #include <morphe/formal/traces.hpp>
 
@@ -294,6 +296,243 @@ int main() {
     s.require("... prequentially (refitted every 200 events), level 2's code a third of level 1's or less when planted; within 2% when not",
               Pq.total[2] < Pq.total[1] / 3 && Cq.total[2] < Cq.total[1] * 1.02,
               std::to_string(Pq.total[1]) + " / " + std::to_string(Pq.total[2]) + "; " + std::to_string(Cq.total[1]) + " / " + std::to_string(Cq.total[2]));
+  }
+
+  // ---- The process net and its patterns -----------------------------------------------------------------------------------------
+  {
+    // Three streets and a building over a window: four episodes on the three streets, each a regime and its end, a census of the
+    // building before each. With the censuses left out: 8 events and 21 wires; the episode (a regime, its end, three wires) found
+    // first, four times; then two episodes in a row, twice; two boxes and three wires left: 15 against 29.
+    mt::Encounters E;
+    E.participants = 4;
+    std::vector<std::string> vk = {"start"};
+    std::vector<double> t = {0};
+    E.present.push_back({0, 1, 2, 3});
+    for (int k = 0; k < 4; k++) {
+      E.present.push_back({3}), vk.push_back("observation");
+      E.present.push_back({0, 1, 2}), vk.push_back("regime");
+      E.present.push_back({0, 1, 2}), vk.push_back("regime ended");
+    }
+    E.present.push_back({0, 1, 2, 3}), vk.push_back("end");
+    t.resize(vk.size());
+    std::iota(t.begin(), t.end(), 0.0);
+    std::vector<char> ends(vk.size(), 0);
+    ends.front() = ends.back() = 1;
+    const auto F = make(E, vk, t, ends, {"street", "street", "street", "building"}, {});
+    const auto S = stars(F);
+    const auto N0 = net(F, S, {"observation"});
+    s.require("a process net: the four censuses left out, 8 events, 21 wires, 6 open ends",
+              N0.left_out == 4 && N0.events == 8 && N0.wires_made == 21 && N0.open_ends == 6,
+              std::to_string(N0.events) + " / " + std::to_string(N0.wires_made) + " / " + std::to_string(N0.open_ends));
+    const auto N = compressed(F, S, {"observation"});
+    const bool episode = N.rules.size() == 2 && N.rules[0].uses == 4 && N.rules[0].wires.size() == 3 && N.rules[0].width == 3 && N.rules[0].length == 2 &&
+                         N.labels[N.rules[0].first] == S[2].rule && N.labels[N.rules[0].second] == S[3].rule;
+    s.require("... compressed: the episode (a regime, its end, three wires) four times, then two episodes in a row twice", episode && N.rules[1].uses == 2 && N.rules[1].length == 4,
+              std::to_string(N.rules.size()) + " rules");
+    s.require("... two boxes and three wires left; the description 15 against 29; the pattern derives regime, end, regime, end",
+              N.boxes.size() == 2 && N.wires.size() == 3 && N.size_before() == 29 && N.size_after() == 15 &&
+                  derive(N, static_cast<std::uint32_t>(N.terminals + 1)) == std::vector<std::uint32_t>{N.rules[0].first, N.rules[0].second, N.rules[0].first, N.rules[0].second});
+    // On random records: every event in one box of the top level; the wires inside the patterns and those left add up; each
+    // pattern derives as many events as its instances hold; the same patterns when the participants are renamed.
+    std::mt19937 g(7);
+    bool covered = true, wires = true, lengths = true, renamed = true;
+    for (int trial = 0; trial < 200; trial++) {
+      const std::size_t P = 2 + g() % 5, V = 4 + g() % 30;
+      const auto R = random_encounters(g, P, V);
+      std::vector<std::string> kinds(V), pk(P), qk(R.pairs.size());
+      for (auto& k : kinds) k = std::string(1, static_cast<char>('e' + g() % 2));
+      for (auto& k : pk) k = std::string(1, static_cast<char>('p' + g() % 2));
+      for (auto& k : qk) k = "u";
+      std::vector<double> time(V);
+      std::iota(time.begin(), time.end(), 0.0);
+      const auto Fr = make(R, kinds, time, std::vector<char>(V, 0), pk, qk);
+      const auto Sr = stars(Fr);
+      const auto Nr = compressed(Fr, Sr);
+      std::vector<int> seen(V, 0);
+      for (const auto& b : Nr.boxes)
+        for (auto v : b.events) seen[v]++;
+      covered = covered && std::all_of(seen.begin(), seen.end(), [](int k) { return k == 1; });
+      std::size_t inside = 0;
+      for (const auto& r : Nr.rules) inside += r.uses * r.wires.size();
+      wires = wires && inside + Nr.wires.size() == Nr.wires_made;
+      for (std::size_t i = 0; i < Nr.rules.size(); i++) lengths = lengths && derive(Nr, static_cast<std::uint32_t>(Nr.terminals + i)).size() == Nr.rules[i].length;
+      // Renamed participants: the same rules, uses and wires.
+      std::vector<std::size_t> pi(P);
+      std::iota(pi.begin(), pi.end(), 0);
+      std::shuffle(pi.begin(), pi.end(), g);
+      mt::Encounters R2;
+      R2.participants = P;
+      for (const auto& pr : R.present) {
+        std::vector<std::size_t> q;
+        for (auto x : pr) q.push_back(pi[x]);
+        R2.present.push_back(q);
+      }
+      for (const auto& pr : R.pairs) R2.pairs.push_back({pi[pr.a], pi[pr.b], pr.meetings});
+      std::vector<std::string> pk2(P);
+      for (std::size_t x = 0; x < P; x++) pk2[pi[x]] = pk[x];
+      const auto F2 = make(R2, kinds, time, std::vector<char>(V, 0), pk2, qk);
+      const auto N2 = compressed(F2, stars(F2));
+      renamed = renamed && N2.rules.size() == Nr.rules.size() && N2.boxes.size() == Nr.boxes.size() && N2.wires.size() == Nr.wires.size();
+      for (std::size_t i = 0; renamed && i < Nr.rules.size(); i++) renamed = N2.rules[i].uses == Nr.rules[i].uses && N2.rules[i].wires.size() == Nr.rules[i].wires.size();
+    }
+    s.require("200 random records: every event in one box of the top level", covered);
+    s.require("... the wires inside the patterns and those left add up to the net's", wires);
+    s.require("... each pattern derives as many events as its instances hold", lengths);
+    s.require("... the same patterns, uses and wires when the participants are renamed", renamed);
+  }
+
+  // ---- Growing foams ------------------------------------------------------------------------------------------------------------
+  {
+    // The keys of an event not yet in a foam, built from what it consumes, equal those stars() reads once it is there: on the hand
+    // foam and on 200 random records, each with random states.
+    std::mt19937 g(11);
+    bool same = true;
+    const auto check_keys = [&](const Foam& Fk) {
+      const auto Sk = stars(Fk);
+      for (std::size_t v = 0; v < Fk.size(); v++) {
+        const Star& s = Sk[v];
+        if (s.boundary) continue;
+        std::vector<std::size_t> position(s.participants.size(), 0);
+        std::vector<std::string> kinds, carried;
+        std::vector<std::vector<std::string>> passes;
+        for (std::size_t i = 0; i < s.participants.size(); i++) {
+          if (!s.in[i]) continue;
+          position[i] = kinds.size();
+          kinds.push_back(Fk.participant[s.participants[i]]), carried.push_back(Fk.state(s.participants[i], v)), passes.emplace_back();
+        }
+        std::vector<std::tuple<std::size_t, std::size_t, std::string>> closes;
+        for (const auto& c : s.corners) {
+          const auto& pair = Fk.pair[Fk.W.lenses[c.lens].pair];
+          if (c.kind == Corner::pass && s.in[c.a]) passes[position[c.a]].push_back(pair);
+          if (c.kind == Corner::close) closes.emplace_back(position[c.a], position[c.b], pair);
+        }
+        const auto [m, ctx] = match_and_context(kinds, carried, passes, closes);
+        same = same && m == s.match && ctx == s.context;
+      }
+    };
+    auto Fh = hand();
+    Fh.states.assign(6, {});
+    Fh.states[0][4] = "office", Fh.states[1][5] = "retail";
+    check_keys(Fh);
+    for (int trial = 0; trial < 200; trial++) {
+      const std::size_t P = 2 + g() % 5, V = 3 + g() % 15;
+      const auto R = random_encounters(g, P, V);
+      std::vector<std::string> kinds(V), pk(P), qk(R.pairs.size());
+      for (auto& k : kinds) k = std::string(1, static_cast<char>('e' + g() % 2));
+      for (auto& k : pk) k = std::string(1, static_cast<char>('p' + g() % 2));
+      for (auto& k : qk) k = std::string(1, static_cast<char>('u' + g() % 2));
+      std::vector<double> time(V);
+      std::iota(time.begin(), time.end(), 0.0);
+      auto Fr = make(R, kinds, time, std::vector<char>(V, 0), pk, qk);
+      Fr.states.assign(P, {});
+      for (std::size_t x = 0; x < P; x++)
+        for (std::size_t v = 0; v < V; v++)
+          if (g() % 3 == 0) Fr.states[x][v] = g() % 2 ? "A" : "B";
+      check_keys(Fr);
+    }
+    s.require("the keys of an event not yet in a foam equal those stars() reads once it is there: the hand foam and 200 random records with states", same);
+
+    // A planted record over 20 years: 20 buildings altered at 0.2 a year each, a further building born at year 10 against the
+    // first street and altered after; three streets taken together by regimes that begin at 3 a year while the streets are free
+    // and end 0.02 years later; ten buildings fronting the first street. The streets carry whether a regime is in force.
+    calx::random::Stream rs(20261126, 4, 5, 6);
+    struct Ev {
+      double t;
+      std::string kind;
+      std::vector<std::size_t> who;
+    };
+    std::vector<Ev> evs;
+    const double T = 20;
+    for (std::size_t b = 3; b <= 23; b++) {
+      double t = b == 23 ? 10.0 : 0.0;
+      while ((t += rs.exponential() / 0.2) < T) evs.push_back({t, "alteration", {b}});
+    }
+    std::size_t starts = 0;
+    double sum_duration = 0;
+    for (double t = 0;;) {
+      t += rs.exponential() / 3.0;
+      if (t >= T) break;
+      evs.push_back({t, "regime", {0, 1, 2}}), starts++;
+      if (t + 0.02 < T) evs.push_back({t + 0.02, "regime ended", {0, 1, 2}}), sum_duration += 0.02;
+      t += 0.02;
+    }
+    evs.push_back({10.0, "birth", {23, 0}});
+    std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) { return a.t < b.t; });
+    mt::Encounters E;
+    E.participants = 24;
+    std::vector<std::string> vk = {"start"};
+    std::vector<double> times = {0};
+    std::vector<std::size_t> everyone(23);
+    std::iota(everyone.begin(), everyone.end(), 0);
+    E.present.push_back(everyone);
+    std::size_t birth_vertex = 0, alterations = 0;
+    for (const auto& e : evs) {
+      E.present.push_back(e.who), vk.push_back(e.kind), times.push_back(e.t);
+      if (e.kind == "birth") birth_vertex = E.present.size() - 1;
+      alterations += e.kind == "alteration";
+    }
+    everyone.push_back(23);
+    E.present.push_back(everyone), vk.push_back("end"), times.push_back(T);
+    const std::size_t END = E.present.size() - 1;
+    for (std::size_t b = 3; b <= 12; b++) E.pairs.push_back({b, 0, {0, END}});
+    E.pairs.push_back({23, 0, {birth_vertex, END}});
+    std::vector<char> ends(E.present.size(), 0);
+    ends.front() = ends.back() = 1;
+    std::vector<std::string> pk(24, "building");
+    pk[0] = pk[1] = pk[2] = "street";
+    auto Fp = make(E, vk, times, ends, pk, std::vector<std::string>(E.pairs.size(), "frontage"));
+    Fp.states.assign(24, {});
+    for (std::size_t x = 0; x < 3; x++) {
+      bool under = false;
+      for (auto v : Fp.W.worldline[x]) {
+        if (ends[v]) continue;
+        Fp.states[x][v] = under ? "under a regime" : "";
+        if (vk[v] == "regime") under = true;
+        if (vk[v] == "regime ended") under = false;
+      }
+    }
+    const auto Sp = stars(Fp);
+    std::vector<std::size_t> all;
+    for (std::size_t v = 1; v < END; v++) all.push_back(v);
+    const auto Gp = learn(Sp, all);
+    const auto Pg = learn_growth(Fp, Sp);
+    double alt = 0, st = 0, dur = 0, endings = 0, born = 0;
+    bool alternate = true, consistent = true, after_birth = true;
+    const int H = 100;
+    for (int h = 0; h < H; h++) {
+      const auto Fg = grow(Fp, Sp, Gp, Pg, rs);
+      consistent = consistent && replay(Fg, stars(Fg)).consistent;
+      std::string expect = "regime";
+      double began = 0, birth_at = -1;
+      for (std::size_t v = 1; v + 1 < Fg.size(); v++) {
+        const auto& k = Fg.vertex[v];
+        alt += k == "alteration";
+        if (k == "birth") born += 1, birth_at = Fg.time[v];
+        if (k == "regime" || k == "regime ended") {
+          alternate = alternate && k == expect;
+          if (k == "regime") st += 1, began = Fg.time[v];
+          else dur += Fg.time[v] - began, endings += 1;
+          expect = k == "regime" ? "regime ended" : "regime";
+        }
+      }
+      // The born building's alterations come after its birth (its participant is the last, when it is born).
+      if (birth_at >= 0)
+        for (std::size_t v = 1; v + 1 < Fg.size(); v++)
+          if (Fg.vertex[v] == "alteration" && Fg.encounters.present[v].front() == Fg.participant.size() - 1) after_birth = after_birth && Fg.time[v] > birth_at;
+    }
+    const double a = static_cast<double>(alterations);
+    s.require("a planted record grown 100 times: alterations as many as the record's on average, within four standard errors",
+              std::fabs(alt / H - a) < 4 * std::sqrt(a / H), std::to_string(alt / H) + " against " + std::to_string(alterations));
+    s.require("... every regime and its end alternate on the three streets, the grammar reading whether one is in force", alternate);
+    s.require("... regimes begun as often as in the record, within 10%, lasting as long on average, within 15%",
+              std::fabs(st / H - static_cast<double>(starts)) < 0.1 * static_cast<double>(starts) && std::fabs(dur / endings - 0.02) < 0.15 * 0.02,
+              std::to_string(st / H) + " against " + std::to_string(starts) + "; " + std::to_string(dur / endings));
+    s.require("... the building born at most once, in about 1 − e⁻² of the histories (0.70 to 0.97), and altered only once born",
+              born / H > 0.7 && born / H < 0.97 && after_birth, std::to_string(born / H));
+    s.require("... every grown foam's cells counted from its stars, χ = Σκ", consistent);
+    calx::random::Stream r1(9, 1, 1, 1), r2(9, 1, 1, 1);
+    const auto g1 = grow(Fp, Sp, Gp, Pg, r1), g2 = grow(Fp, Sp, Gp, Pg, r2);
+    s.require("... the same stream, the same foam", g1.vertex == g2.vertex && g1.time == g2.time);
   }
 
   // ---- Dominance and refusals ---------------------------------------------------------------------------------------------------

@@ -13,6 +13,7 @@ Each record captures one decision that shapes the structure, interfaces or tooli
 | [0002](0002-scope-boundaries-and-dependencies.md) | Scope, boundaries and dependencies: grammars whose words are geometric | Accepted |
 | [0003](0003-the-first-modules.md) | The first modules | Accepted, provisionally |
 | [0004](0004-grammars-whose-words-are-foams.md) | Grammars whose words are foams: stars as productions, their keys and curvature, the grammar by backoff judged held out and prequentially, lives by Re-Pair | Accepted, provisionally |
+| [0005](0005-patterns-across-worldlines-and-growing-foams.md) | Patterns across worldlines (the process net compressed by digrams) and foams grown from their grammar (sites, rates per exposure, the context-sensitive grammar, states as learned attributes) | Accepted, provisionally |
 
 ## 2. Template
 

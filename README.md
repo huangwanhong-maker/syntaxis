@@ -26,14 +26,14 @@ A method belongs here when it is a grammar over geometric or topological objects
 | [parsing](parsing/README.md) | The syntax analyser: a graph parsed by a grammar into a forest, with coverage and whether it is derived | draft |
 | [stochastic](stochastic/README.md) | Categories by shape, the PCFG by relative frequency, the PCSG by parent annotation and a non-crossing condition; sampling and its statistics | draft |
 | [simplicial](simplicial/README.md) | 2-complexes from polygons and plane graphs; letters; the gluing grammar with its entropies and conditioned growth; the replacement grammar and its analyser | draft |
-| [foams](foams/README.md) | Foams and their stars (roles, corners, curvature summing to χ, four canonical keys); the Foata steps of a record's trace; the stochastic grammar by hierarchical Dirichlet backoff, judged held out and prequentially, compared by dominance; rates per exposure; the participants' lives compressed by Re-Pair | draft |
+| [foams](foams/README.md) | Foams and their stars (roles, corners, curvature summing to χ, four canonical keys); the Foata steps of a record's trace; the stochastic grammar by hierarchical Dirichlet backoff, judged held out and prequentially, compared by dominance; rates per exposure; the participants' lives compressed by Re-Pair; patterns across worldlines, the process net compressed by digrams; foams grown from their grammar | draft |
 | hyperedge | Hyperedge-replacement grammars, which share nodes between copies (Sierpinski's gasket), and their parsing | planned |
 | exact | An exact parser for small inputs by backtracking over the greedy analyser's choices | planned |
 | solid | Grammars on 3-complexes whose words are tetrahedra | planned |
 
 ## 3. Checks
 
-`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 95 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; twenty derivations of triangles recovered by the analyser from their leaves alone; a foam worked by hand, with χ = Σκ on 200 random records; and a context planted in events, found by the context-sensitive grammar and by no other.
+`node development/tools/run-cpp.mjs foundations/syntaxis foundations/syntaxis` from the infrastructure's root builds and runs the 109 checks. Each holds against an answer known exactly: canonical keys invariant under similarity; self-similar structures compressed to an axiom of three nodes; derivations replayed to rounding; a turned, scaled and moved copy parsed wholly by the grammar learned from the original; the leaf count of a replacement derivation; twenty derivations of triangles recovered by the analyser from their leaves alone; a foam worked by hand, with χ = Σκ on 200 random records; and a context planted in events, found by the context-sensitive grammar and by no other.
 
 ## 4. Dependencies
 

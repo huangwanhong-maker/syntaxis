@@ -23,7 +23,8 @@
 //   star     everything, with each participant's state where states are given;
 //   rule     the event's action: its kind, the participants' kinds and roles, the open and close corners (no passes, no states);
 //   match    what the event consumes: the participants with an arriving end, by kind, and the close corners among them;
-//   context  the match with those participants' states and their passes (the lenses open on their other sides).
+//   context  the match with those participants' states and their passes (the lenses open on their other sides);
+// and the shape, the rule's key with the event's kind left out (the action alone), which tells the rules that fit one site.
 // Two stars have equal keys exactly when their structures are isomorphic. A key whose graph has no edge between two participants
 // (no open or close corner among them: the event and its participants with their loops) is the sorted list of the participants'
 // labels with their loops, exact for such graphs and cheap for an event that touches hundreds of participants; any other is the
@@ -116,6 +117,7 @@ struct Star {
   int ends = 0, opens = 0, closes = 0, passes = 0;
   double kappa = 0;                       // 1 − ends/2 + (opens + closes)/2
   std::string star, rule, match, context;  // canonical keys (a boundary vertex: its kind alone)
+  std::string shape;                      // the rule's key with the event's kind left out: its action alone
   bool exact = true;                      // every key an exact canonical form
 };
 
@@ -208,7 +210,7 @@ inline std::vector<Star> stars(const Foam& F) {
     }
     s.kappa = 1 - s.ends / 2.0 + (s.opens + s.closes) / 2.0;
     if (s.boundary) {
-      s.star = s.rule = s.match = s.context = "boundary:" + F.vertex[v];
+      s.star = s.rule = s.match = s.context = s.shape = "boundary:" + F.vertex[v];
       continue;
     }
     // The four keys.
@@ -246,7 +248,11 @@ inline std::vector<Star> stars(const Foam& F) {
     }
     const auto ks = detail::key_any(star), kr = detail::key_any(rule), km = detail::key_any(match), kc = detail::key_any(context);
     s.star = ks.code, s.rule = kr.code, s.match = km.code, s.context = kc.code;
-    s.exact = ks.exact && kr.exact && km.exact && kc.exact;
+    auto bare = rule;
+    bare.vertex[0] = "e";
+    const auto kb = detail::key_any(bare);
+    s.shape = kb.code;
+    s.exact = ks.exact && kr.exact && km.exact && kc.exact && kb.exact;
   }
   return S;
 }
