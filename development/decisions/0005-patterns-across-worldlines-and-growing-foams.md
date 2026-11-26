@@ -1,6 +1,6 @@
 # 0005. Patterns across Worldlines and Growing Foams
 
-- **Status:** Accepted, provisionally (2026-11-26).
+- **Status:** Accepted, provisionally (2026-11-26); §2.2 amended by [decision 0006](0006-sites-as-automata.md).
 - **Date:** 2026-11-26
 - **Decided by:** the infrastructure's user, who asked for the three things decision 0004 left unbuilt: patterns spanning several worldlines found from the complex itself, a generator that grows a foam from its grammar, and a second city's record read the same way (the infrastructure's ADR 0171).
 

@@ -433,8 +433,9 @@ int main() {
     s.require("the keys of an event not yet in a foam equal those stars() reads once it is there: the hand foam and 200 random records with states", same);
 
     // A planted record over 20 years: 20 buildings altered at 0.2 a year each, a further building born at year 10 against the
-    // first street and altered after; three streets taken together by regimes that begin at 3 a year while the streets are free
-    // and end 0.02 years later; ten buildings fronting the first street. The streets carry whether a regime is in force.
+    // first street and altered after; three streets taken together by regimes that begin at 3 a year while none of theirs is in
+    // force and end 0.02 years later; the first two streets taken by regimes of their own that begin at one a year and last half a
+    // year, overlapping the others; ten buildings fronting the first street. The streets carry whether a regime is in force.
     calx::random::Stream rs(20261126, 4, 5, 6);
     struct Ev {
       double t;
@@ -455,6 +456,14 @@ int main() {
       evs.push_back({t, "regime", {0, 1, 2}}), starts++;
       if (t + 0.02 < T) evs.push_back({t + 0.02, "regime ended", {0, 1, 2}}), sum_duration += 0.02;
       t += 0.02;
+    }
+    std::size_t starts2 = 0;
+    for (double t = 0;;) {
+      t += rs.exponential() / 1.0;
+      if (t >= T) break;
+      evs.push_back({t, "regime", {0, 1}}), starts2++;
+      if (t + 0.5 < T) evs.push_back({t + 0.5, "regime ended", {0, 1}});
+      t += 0.5;
     }
     evs.push_back({10.0, "birth", {23, 0}});
     std::sort(evs.begin(), evs.end(), [](const Ev& a, const Ev& b) { return a.t < b.t; });
@@ -483,36 +492,39 @@ int main() {
     auto Fp = make(E, vk, times, ends, pk, std::vector<std::string>(E.pairs.size(), "frontage"));
     Fp.states.assign(24, {});
     for (std::size_t x = 0; x < 3; x++) {
-      bool under = false;
+      int open = 0;
       for (auto v : Fp.W.worldline[x]) {
         if (ends[v]) continue;
-        Fp.states[x][v] = under ? "under a regime" : "";
-        if (vk[v] == "regime") under = true;
-        if (vk[v] == "regime ended") under = false;
+        Fp.states[x][v] = open > 0 ? "under a regime" : "";
+        if (vk[v] == "regime") open++;
+        if (vk[v] == "regime ended") open--;
       }
     }
     const auto Sp = stars(Fp);
-    std::vector<std::size_t> all;
-    for (std::size_t v = 1; v < END; v++) all.push_back(v);
-    const auto Gp = learn(Sp, all);
     const auto Pg = learn_growth(Fp, Sp);
-    double alt = 0, st = 0, dur = 0, endings = 0, born = 0;
+    double alt = 0, st = 0, dur = 0, endings = 0, born = 0, st2 = 0, dur2 = 0, endings2 = 0;
     bool alternate = true, consistent = true, after_birth = true;
+    std::string first_break;
     const int H = 100;
     for (int h = 0; h < H; h++) {
-      const auto Fg = grow(Fp, Sp, Gp, Pg, rs);
+      const auto Fg = grow(Fp, Sp, Pg, rs);
       consistent = consistent && replay(Fg, stars(Fg)).consistent;
-      std::string expect = "regime";
-      double began = 0, birth_at = -1;
+      std::string expect[2] = {"regime", "regime"};
+      double began[2] = {0, 0}, birth_at = -1;
       for (std::size_t v = 1; v + 1 < Fg.size(); v++) {
         const auto& k = Fg.vertex[v];
         alt += k == "alteration";
         if (k == "birth") born += 1, birth_at = Fg.time[v];
         if (k == "regime" || k == "regime ended") {
-          alternate = alternate && k == expect;
-          if (k == "regime") st += 1, began = Fg.time[v];
-          else dur += Fg.time[v] - began, endings += 1;
-          expect = k == "regime" ? "regime ended" : "regime";
+          const int site = Fg.encounters.present[v].size() == 3 ? 0 : 1;  // the three streets, or the first two
+          if (alternate && k != expect[site])
+            first_break = "history " + std::to_string(h) + ", site " + std::to_string(site) + " at " + std::to_string(Fg.time[v]) + ": " + k + " after " + std::to_string(began[site]) +
+                          "; states carried: " + Fg.state(Fg.encounters.present[v][0], v) + "|" + Fg.state(Fg.encounters.present[v][1], v);
+          alternate = alternate && k == expect[site];
+          if (k == "regime") (site == 0 ? st : st2) += 1, began[site] = Fg.time[v];
+          else if (site == 0) dur += Fg.time[v] - began[0], endings += 1;
+          else dur2 += Fg.time[v] - began[1], endings2 += 1;
+          expect[site] = k == "regime" ? "regime ended" : "regime";
         }
       }
       // The born building's alterations come after its birth (its participant is the last, when it is born).
@@ -523,15 +535,17 @@ int main() {
     const double a = static_cast<double>(alterations);
     s.require("a planted record grown 100 times: alterations as many as the record's on average, within four standard errors",
               std::fabs(alt / H - a) < 4 * std::sqrt(a / H), std::to_string(alt / H) + " against " + std::to_string(alterations));
-    s.require("... every regime and its end alternate on the three streets, the grammar reading whether one is in force", alternate);
-    s.require("... regimes begun as often as in the record, within 10%, lasting as long on average, within 15%",
-              std::fabs(st / H - static_cast<double>(starts)) < 0.1 * static_cast<double>(starts) && std::fabs(dur / endings - 0.02) < 0.15 * 0.02,
-              std::to_string(st / H) + " against " + std::to_string(starts) + "; " + std::to_string(dur / endings));
+    s.require("... every regime and its end alternate at each of the two sites, though they overlap: each site reads its own states", alternate, first_break);
+    s.require("... regimes begun as often as in the record at each site, within 10% and 15%, lasting as long on average, within 15%",
+              std::fabs(st / H - static_cast<double>(starts)) < 0.1 * static_cast<double>(starts) && std::fabs(dur / endings - 0.02) < 0.15 * 0.02 &&
+                  std::fabs(st2 / H - static_cast<double>(starts2)) < 0.15 * static_cast<double>(starts2) && std::fabs(dur2 / endings2 - 0.5) < 0.15 * 0.5,
+              std::to_string(st / H) + " against " + std::to_string(starts) + ", " + std::to_string(st2 / H) + " against " + std::to_string(starts2) + "; " +
+                  std::to_string(dur / endings) + ", " + std::to_string(dur2 / endings2));
     s.require("... the building born at most once, in about 1 − e⁻² of the histories (0.70 to 0.97), and altered only once born",
               born / H > 0.7 && born / H < 0.97 && after_birth, std::to_string(born / H));
     s.require("... every grown foam's cells counted from its stars, χ = Σκ", consistent);
     calx::random::Stream r1(9, 1, 1, 1), r2(9, 1, 1, 1);
-    const auto g1 = grow(Fp, Sp, Gp, Pg, r1), g2 = grow(Fp, Sp, Gp, Pg, r2);
+    const auto g1 = grow(Fp, Sp, Pg, r1), g2 = grow(Fp, Sp, Pg, r2);
     s.require("... the same stream, the same foam", g1.vertex == g2.vertex && g1.time == g2.time);
   }
 

@@ -6,18 +6,26 @@
 //     lens (an alteration of any building);
 //   - concrete: the very participants and pairs of an event the record holds, and the participants and pairs it begins (a regime on
 //     one set of street spaces, a building born against its neighbours); a site that begins a participant happens once.
-// A site's rate in each condition (the states its participants carry, distinct and sorted) and each era of the window is the
-// number of the record's events there in that condition and era over the time it spent so: rates per exposure, at the sites the
-// record shows. The rule is drawn from the grammar's context-sensitive probability given the context the event would have (the
-// match, the states carried into it, the lenses open beside it), renormalised over the rules whose action fits the site. The states
-// are attributes the productions update: the state a participant carries out of an event is drawn from the record's own table of
-// what followed that state, rule and place, and kept where the table is silent (Knuth's attributes, here learned). The process is a
-// continuous-time Markov chain on the attributed network of the moment, simulated by Gillespie's direct method ("Exact stochastic
-// simulation of coupled chemical reactions", J. Phys. Chem. 81, 2340–2361, 1977) on a calx stream; an era's end restarts it, the
-// chain being memoryless.
+// Each site is an automaton. Its condition is the set of states its own events have left on its participants (each starting from
+// the state the participant carried into its first event), and a participant's state after an event at the site is the one the
+// record's table gives most often for the state it carried in, the event's rule and its place (Knuth's attributes, here learned
+// from what followed in the record). A site's rate in each condition and each era of the window is the number of its events in the
+// record in that condition and era over the time it spent so: rates per exposure, at the sites the record shows. The rule is drawn
+// from the grammar's context-sensitive probability given the context the event would have (the match, the site's states, the lenses
+// open beside it), renormalised over the rules whose action fits the site and that the record shows at a site of that action in
+// that condition (a production's precondition on its attributes: no regime ends where none is in force); the grammar is learned
+// from the record by grammar.hpp's backoff with each event's context keyed by its own site's states, the context it is grown in. A participant's state in the grown foam is a state some
+// site holding it has left, none while no site has. The process is a continuous-time Markov chain on the attributed network of the
+// moment, simulated by Gillespie's direct method ("Exact stochastic simulation of coupled chemical reactions", J. Phys. Chem. 81,
+// 2340–2361, 1977) on a calx stream; an era's end restarts it, the chain being memoryless.
+//
+// *Rationale.* A condition read from the participants' states alone would let a site see another's: a regime on a street begun
+// at one site would put a second site, sharing that street, under a regime, and the second would end what it never began. Each site
+// reading its own states pairs an ending with its own beginning, as a record pairs a permit's end with its start.
 //
 // What it cannot do: grow a site the record never shows for more than one participant (a permit on a set of streets no permit
-// used, a building born where none was); hold time beyond the rates of its eras; change a state through an event it left out.
+// used, a building born where none was); hold time beyond the rates of its eras; change a state through an event it left out; let
+// one site's events change another's condition.
 
 #pragma once
 
@@ -68,6 +76,7 @@ struct GrowSite {
   std::string shape;             // its action without its kind
   bool once = false;             // it begins a participant
   std::size_t events = 0;        // the record's events there
+  std::vector<std::size_t> consumed;                // a concrete site's consumed participants, in its example's order
   std::vector<std::map<std::string, double>> rate;  // era ↦ condition ↦ rate per unit of time (per participant, for a generic site)
 };
 
@@ -78,7 +87,20 @@ struct Growth {
   std::map<std::string, std::vector<std::string>> rules_of;          // shape ↦ the rules with that action
   std::map<std::string, std::size_t> example;                        // rule ↦ an event of it
   std::map<std::tuple<std::string, std::string, std::string>, std::map<std::string, std::size_t>> after;  // (state in, rule, place) ↦ state out ↦ count
+  std::vector<std::string> initial;                  // participant ↦ the state it carried into its first event grown
+  Grammar grammar;                                   // learned with each event's context keyed by its site's own states
+  std::map<std::pair<std::string, std::string>, std::set<std::string>> support;  // (shape, condition) ↦ the rules the record shows there
   std::set<std::string> left_out;                    // kinds of event the growth leaves out
+  // The state a participant carries out of an event: the table's commonest for the state carried in, the rule and the place.
+  std::string step(const std::string& in, const std::string& rule, const std::string& place) const {
+    const auto it = after.find({in, rule, place});
+    if (it == after.end()) return in;
+    std::string best = in;
+    std::size_t n = 0;
+    for (const auto& [k, c] : it->second)
+      if (c > n) best = k, n = c;
+    return best;
+  }
   std::size_t era(double t) const { return static_cast<std::size_t>(std::upper_bound(breaks.begin(), breaks.end(), t) - breaks.begin()); }
 };
 
@@ -136,79 +158,56 @@ inline Growth learn_growth(const Foam& F, const std::vector<Star>& S, const std:
       const auto v = kept_on[x][k], w = kept_on[x][k + 1];
       P.after[{F.state(x, v), S[v].rule, place_of(F, S[v], position(S[v], x))}][F.state(x, w)]++;
     }
-  // Each participant's states in time: [its life's start, its first kept event] the state carried into that event, and so on; after
-  // its last kept event, the state the table gives most often.
-  struct Piece {
-    double from, to;
-    std::string state;
-  };
-  std::vector<std::vector<Piece>> pieces(X);
+  // Each participant's life, and the state it carried into its first kept event.
   std::vector<std::pair<double, double>> life(X, {0, -1});
+  P.initial.assign(X, {});
   for (std::size_t x = 0; x < X; x++) {
     const auto& line = F.W.worldline[x];
     if (line.empty()) continue;
     life[x] = {F.time[line.front()], F.time[line.back()]};
-    double t = life[x].first;
-    std::string carried = kept_on[x].empty() ? F.state(x, line.back()) : F.state(x, kept_on[x].front());
-    for (std::size_t k = 0; k < kept_on[x].size(); k++) {
-      const auto v = kept_on[x][k];
-      carried = F.state(x, v);
-      pieces[x].push_back({t, F.time[v], carried});
-      t = F.time[v];
-      const auto it = P.after.find({carried, S[v].rule, place_of(F, S[v], position(S[v], x))});
-      carried = it == P.after.end() ? carried : detail::most(it->second, carried);
-    }
-    pieces[x].push_back({t, life[x].second, carried});
+    P.initial[x] = kept_on[x].empty() ? F.state(x, line.back()) : F.state(x, kept_on[x].front());
   }
-  const auto state_at = [&](std::size_t x, double t) {
-    for (const auto& p : pieces[x])
-      if (t <= p.to) return p.state;
-    return pieces[x].empty() ? std::string() : pieces[x].back().state;
-  };
-  // The sites.
+  // The sites, each with its own events in time.
   std::map<std::string, std::size_t> site_of;
-  std::vector<std::vector<std::size_t>> consumed_of;  // a concrete site's consumed participants
+  std::vector<std::vector<std::size_t>> own;  // site ↦ its events
   for (std::size_t v = 0; v < F.size(); v++) {
     if (!kept[v]) continue;
     const Star& s = S[v];
     std::string key;
-    std::vector<std::size_t> consumed;
-    bool once = false;
+    std::vector<std::size_t> consumed, begun, pairs;
     if (detail::generic_star(s)) {
       key = "generic\x1e" + F.participant[s.participants[0]] + "\x1e" + s.shape;
     } else {
-      std::vector<std::size_t> begun, pairs;
       for (std::size_t i = 0; i < s.participants.size(); i++) (s.in[i] ? consumed : begun).push_back(s.participants[i]);
       for (const auto& c : s.corners)
         if (c.kind != Corner::pass) pairs.push_back(F.W.lenses[c.lens].pair);
-      std::sort(consumed.begin(), consumed.end()), std::sort(begun.begin(), begun.end()), std::sort(pairs.begin(), pairs.end());
+      auto cs = consumed, bs = begun;
+      std::sort(cs.begin(), cs.end()), std::sort(bs.begin(), bs.end()), std::sort(pairs.begin(), pairs.end());
       pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-      once = !begun.empty();
       key = "concrete\x1e" + s.shape;
-      for (auto x : consumed) key += "\x1e" + std::to_string(x);
+      for (auto x : cs) key += "\x1e" + std::to_string(x);
       key += "\x1e|";
-      for (auto x : begun) key += "\x1e" + std::to_string(x);
+      for (auto x : bs) key += "\x1e" + std::to_string(x);
       key += "\x1e|";
-      for (auto p : pairs) key += "\x1e" + std::to_string(p);
+      for (auto q : pairs) key += "\x1e" + std::to_string(q);
     }
     auto it = site_of.find(key);
     if (it == site_of.end()) {
       GrowSite g;
-      g.generic = detail::generic_star(s), g.kind = g.generic ? F.participant[s.participants[0]] : "", g.example = v, g.shape = s.shape, g.once = once;
+      g.generic = detail::generic_star(s), g.kind = g.generic ? F.participant[s.participants[0]] : "", g.example = v, g.shape = s.shape;
+      g.once = !begun.empty(), g.consumed = consumed;
       g.rate.assign(eras, {});
       it = site_of.emplace(key, P.sites.size()).first;
       P.sites.push_back(g);
-      consumed_of.push_back(consumed);
+      own.emplace_back();
     }
-    auto& g = P.sites[it->second];
-    g.events++;
-    std::vector<std::string> st;
-    for (std::size_t i = 0; i < s.participants.size(); i++)
-      if (s.in[i]) st.push_back(F.state(s.participants[i], v));
-    g.rate[P.era(F.time[v])][detail::condition(st)] += 1;  // a count, divided by the exposure below
+    P.sites[it->second].events++;
+    own[it->second].push_back(v);
   }
-  // Exposures: a generic site, every participant of its kind alive in each state; a concrete one, the time all its consumed
-  // participants are alive (until its event, for a site that happens once) in each condition.
+  std::map<std::size_t, std::map<std::size_t, std::string>> own_at;  // event ↦ participant ↦ its site's state carried in
+  // Each site's events counted, and its exposure measured, by the conditions its own events leave: a generic site's on each
+  // participant of its kind alive, a concrete one's while all its consumed participants are alive (until its event, for a site that
+  // happens once).
   for (std::size_t i = 0; i < P.sites.size(); i++) {
     auto& g = P.sites[i];
     std::vector<std::map<std::string, double>> exposure(eras);
@@ -218,27 +217,32 @@ inline Growth learn_growth(const Foam& F, const std::vector<Star>& S, const std:
         if (hi > lo) exposure[k][c] += hi - lo;
       }
     };
-    if (g.generic) {
-      for (std::size_t x = 0; x < X; x++)
-        if (F.participant[x] == g.kind)
-          for (const auto& p : pieces[x]) add(p.from, p.to, p.state);
-    } else {
-      const auto& cs = consumed_of[i];
-      double lo = P.from, hi = P.to;
-      for (auto x : cs) lo = std::max(lo, life[x].first), hi = std::min(hi, life[x].second);
-      if (g.once) hi = std::min(hi, F.time[g.example]);
-      std::set<double> cuts = {lo, hi};
-      for (auto x : cs)
-        for (const auto& p : pieces[x])
-          if (p.to > lo && p.to < hi) cuts.insert(p.to);
-      for (auto k : P.breaks)
-        if (k > lo && k < hi) cuts.insert(k);
-      for (auto a = cuts.begin(), b = std::next(cuts.begin()); b != cuts.end(); ++a, ++b) {
-        std::vector<std::string> st;
-        const double mid = (*a + *b) / 2;
-        for (auto x : cs) st.push_back(state_at(x, mid));
-        add(*a, *b, detail::condition(st));
+    // The site's states on some participants, run through its events on them from `lo` to `hi`; each event's states kept.
+    const auto run = [&](const std::vector<std::size_t>& who, const std::vector<std::size_t>& events, double lo, double hi) {
+      std::vector<std::string> st;
+      for (auto x : who) st.push_back(P.initial[x]);
+      double t = lo;
+      for (auto v : events) {
+        if (F.time[v] < lo || F.time[v] > hi) continue;
+        for (std::size_t k = 0; k < who.size(); k++) own_at[v][who[k]] = st[k];
+        P.support[{g.shape, detail::condition(st)}].insert(S[v].rule);
+        add(t, F.time[v], detail::condition(st));
+        g.rate[P.era(F.time[v])][detail::condition(st)] += 1;  // a count, divided by the exposure below
+        t = F.time[v];
+        for (std::size_t k = 0; k < who.size(); k++) st[k] = P.step(st[k], S[v].rule, place_of(F, S[v], position(S[v], who[k])));
       }
+      add(t, hi, detail::condition(st));
+    };
+    if (g.generic) {
+      std::map<std::size_t, std::vector<std::size_t>> on;  // participant ↦ the site's events on it
+      for (auto v : own[i]) on[S[v].participants[0]].push_back(v);
+      for (std::size_t x = 0; x < X; x++)
+        if (F.participant[x] == g.kind && life[x].second >= life[x].first) run({x}, on[x], life[x].first, life[x].second);
+    } else {
+      double lo = P.from, hi = P.to;
+      for (auto x : g.consumed) lo = std::max(lo, life[x].first), hi = std::min(hi, life[x].second);
+      if (g.once) hi = std::min(hi, F.time[g.example]);
+      run(g.consumed, own[i], lo, hi);
     }
     for (std::size_t k = 0; k < eras; k++)
       for (auto& [c, n] : g.rate[k]) {
@@ -246,28 +250,65 @@ inline Growth learn_growth(const Foam& F, const std::vector<Star>& S, const std:
         n = (e == exposure[k].end() || e->second <= 0) ? 0 : n / e->second;
       }
   }
+  // The grammar the growth draws from: each event's context keyed by its site's own states.
+  auto keyed = S;
+  std::vector<std::size_t> events;
+  for (std::size_t v = 0; v < F.size(); v++) {
+    if (!kept[v]) continue;
+    events.push_back(v);
+    const Star& s = S[v];
+    std::vector<std::size_t> position(s.participants.size(), 0);
+    std::vector<std::string> kinds, carried;
+    std::vector<std::vector<std::string>> passes;
+    for (std::size_t i = 0; i < s.participants.size(); i++) {
+      if (!s.in[i]) continue;
+      position[i] = kinds.size();
+      const auto x = s.participants[i];
+      kinds.push_back(F.participant[x]), passes.emplace_back();
+      const auto it = own_at[v].find(x);
+      carried.push_back(it == own_at[v].end() ? F.state(x, v) : it->second);
+    }
+    std::vector<std::tuple<std::size_t, std::size_t, std::string>> closes;
+    for (const auto& c : s.corners) {
+      const auto& pair = F.pair[F.W.lenses[c.lens].pair];
+      if (c.kind == Corner::pass && s.in[c.a]) passes[position[c.a]].push_back(pair);
+      if (c.kind == Corner::close) closes.emplace_back(position[c.a], position[c.b], pair);
+    }
+    keyed[v].context = match_and_context(kinds, carried, passes, closes).second;
+  }
+  if (!events.empty()) P.grammar = learn(keyed, events);
   return P;
 }
 
-// A foam grown from the grammar G and the growth P, from the record F's moment at its start (its participants then alive with the
-// states they carried into their first events, its pairs then open) to its end. Participants and pairs keep their records' indices
-// and kinds; those never begun are left out.
-inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, const Growth& P, calx::random::Stream& rs) {
-  const std::size_t X = F.participant.size(), Q = F.encounters.pairs.size();
-  std::vector<char> alive(X, 0), pair_alive(Q, 0), fired(P.sites.size(), 0), begun(X, 0);
-  std::vector<std::string> state(X);
-  for (auto x : F.encounters.present.front()) {
-    alive[x] = begun[x] = 1;
-    std::size_t first = F.size();
-    for (auto v : F.W.worldline[x])
-      if (!S[v].boundary && !(P.left_out.count(F.vertex[v]) && passes_only(S[v]))) {
-        first = v;
-        break;
-      }
-    state[x] = first < F.size() ? F.state(x, first) : F.state(x, F.W.worldline[x].back());
-  }
+// A foam grown from the growth P (its sites, rates and grammar), from the record F's moment at its start (its participants then alive, its pairs
+// then open) to its end. Participants and pairs keep their records' indices and kinds; those never begun are left out.
+inline Foam grow(const Foam& F, const std::vector<Star>& S, const Growth& P, calx::random::Stream& rs) {
+  const Grammar& G = P.grammar;
+  const std::size_t X = F.participant.size(), Q = F.encounters.pairs.size(), N = P.sites.size();
+  std::vector<char> alive(X, 0), pair_alive(Q, 0), fired(N, 0), begun(X, 0);
+  for (auto x : F.encounters.present.front()) alive[x] = begun[x] = 1;
   for (std::size_t q = 0; q < Q; q++)
     if (!F.encounters.pairs[q].meetings.empty() && F.encounters.pairs[q].meetings.front() == 0) pair_alive[q] = 1;
+  // Each site's own states: a concrete site's on its consumed participants, a generic one's on each participant of its kind; and,
+  // for each participant, the states the sites holding it have left, of which its state in the grown foam is one.
+  std::vector<std::vector<std::string>> own_c(N);
+  std::vector<std::map<std::size_t, std::string>> own_g(N);
+  std::vector<std::map<std::string, int>> hold(X);
+  const auto initial = [&](std::size_t x) { return x < P.initial.size() ? P.initial[x] : std::string(); };
+  const auto held = [&](std::size_t x, const std::string& st, int d) {
+    if (st.empty()) return;
+    if ((hold[x][st] += d) == 0) hold[x].erase(st);
+  };
+  const auto state_of = [&](std::size_t x) { return hold[x].empty() ? std::string() : hold[x].begin()->first; };
+  for (std::size_t i = 0; i < N; i++) {
+    const auto& g = P.sites[i];
+    if (g.generic) {
+      for (std::size_t x = 0; x < X; x++)
+        if (F.participant[x] == g.kind) own_g[i][x] = initial(x), held(x, initial(x), 1);
+    } else {
+      for (auto x : g.consumed) own_c[i].push_back(initial(x)), held(x, initial(x), 1);
+    }
+  }
   // The foam being grown.
   std::vector<std::vector<std::size_t>> present = {F.encounters.present.front()};
   std::vector<std::string> kind = {F.vertex.front()};
@@ -283,32 +324,27 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
   const std::size_t eras = P.breaks.size() + 1;
   const auto era_end = [&](std::size_t k) { return k + 1 == eras ? P.to : P.breaks[k]; };
   while (era < eras) {
-    // The weight of every site now, and for a generic one the participants in each condition.
-    std::vector<double> weight(P.sites.size(), 0);
-    std::vector<std::map<std::string, std::vector<std::size_t>>> who(P.sites.size());
+    // The weight of every site now, and for a generic one its participants in each condition.
+    std::vector<double> weight(N, 0);
+    std::vector<std::map<std::string, std::vector<std::size_t>>> who(N);
     double total = 0;
-    for (std::size_t i = 0; i < P.sites.size(); i++) {
+    for (std::size_t i = 0; i < N; i++) {
       const auto& g = P.sites[i];
       const auto& rates = g.rate[era];
       if (rates.empty()) continue;
       if (g.generic) {
-        for (std::size_t x = 0; x < X; x++)
-          if (alive[x] && F.participant[x] == g.kind) {
-            const auto r = rates.find(state[x]);
-            if (r != rates.end() && r->second > 0) who[i][state[x]].push_back(x), weight[i] += r->second;
+        for (const auto& [x, st] : own_g[i])
+          if (alive[x]) {
+            const auto r = rates.find(st);
+            if (r != rates.end() && r->second > 0) who[i][st].push_back(x), weight[i] += r->second;
           }
       } else {
         if (g.once && fired[i]) continue;
         const Star& s = S[g.example];
         bool ok = true;
-        std::vector<std::string> st;
-        for (std::size_t k = 0; k < s.participants.size() && ok; k++) {
-          const auto x = s.participants[k];
-          if (s.in[k]) ok = alive[x], st.push_back(state[x]);
-          else ok = !begun[x];
-        }
+        for (std::size_t k = 0; k < s.participants.size() && ok; k++) ok = s.in[k] ? alive[s.participants[k]] != 0 : !begun[s.participants[k]];
         if (!ok) continue;
-        const auto r = rates.find(detail::condition(st));
+        const auto r = rates.find(detail::condition(own_c[i]));
         if (r != rates.end()) weight[i] = r->second;
       }
       total += weight[i];
@@ -322,11 +358,11 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
     // The site, by weight; for a generic site, a participant in proportion to its condition's rate.
     double u = rs.uniform() * total;
     std::size_t i = 0;
-    while (i + 1 < P.sites.size() && u >= weight[i]) u -= weight[i], i++;
+    while (i + 1 < N && u >= weight[i]) u -= weight[i], i++;
     const auto& g = P.sites[i];
     const Star& tpl = S[g.example];
     std::vector<std::size_t> consumed, newcomers;
-    std::vector<std::string> places;
+    std::vector<std::string> carried, places;
     if (g.generic) {
       double w = rs.uniform() * weight[i];
       std::size_t x = 0;
@@ -338,10 +374,13 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
         }
         w -= r * static_cast<double>(xs.size()), x = xs.back();
       }
-      consumed = {x};
-      places = {place_of(F, tpl, 0)};
+      consumed = {x}, carried = {own_g[i][x]}, places = {place_of(F, tpl, 0)};
     } else {
-      for (std::size_t k = 0; k < tpl.participants.size(); k++) (tpl.in[k] ? consumed : newcomers).push_back(tpl.participants[k]);
+      for (std::size_t k = 0; k < tpl.participants.size(); k++) {
+        if (tpl.in[k]) consumed.push_back(tpl.participants[k]), places.push_back(place_of(F, tpl, k));
+        else newcomers.push_back(tpl.participants[k]);
+      }
+      carried = own_c[i];
     }
     // The pairs the event meets (the example's, alive), opens (those it begins) and ends (those it meets for the last time in the
     // record); the context the event would have.
@@ -353,10 +392,10 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
         (pair_alive[q] ? meets : opens).insert(q);
         if (F.encounters.pairs[q].meetings.back() == g.example) closing.insert(q);
       }
-    std::vector<std::string> kinds, carried;
+    std::vector<std::string> kinds;
     std::vector<std::vector<std::string>> passes;
     for (auto x : consumed) {
-      kinds.push_back(F.participant[x]), carried.push_back(state[x]), passes.emplace_back();
+      kinds.push_back(F.participant[x]), passes.emplace_back();
       for (auto q : pairs_of[x])
         if (pair_alive[q] && !meets.count(q)) passes.back().push_back(F.pair[q]);
     }
@@ -367,8 +406,15 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
       if (a < consumed.size() && b < consumed.size()) closes.emplace_back(a, b, F.pair[q]);
     }
     const auto [m, c] = match_and_context(kinds, carried, passes, closes);
-    // The rule, among those of the site's action, by the grammar's probability in that context.
-    const auto& candidates = P.rules_of.at(g.shape);
+    // The rule, among those of the site's action that the record shows in the site's condition, by the grammar's probability in
+    // that context.
+    std::vector<std::string> candidates = P.rules_of.at(g.shape);
+    if (const auto sp = P.support.find({g.shape, detail::condition(carried)}); sp != P.support.end()) {
+      std::vector<std::string> shown;
+      for (const auto& r : candidates)
+        if (sp->second.count(r)) shown.push_back(r);
+      if (!shown.empty()) candidates = shown;
+    }
     std::vector<double> p(candidates.size());
     double sum = 0;
     for (std::size_t k = 0; k < candidates.size(); k++) sum += p[k] = p2(G, candidates[k], m, c);
@@ -376,37 +422,30 @@ inline Foam grow(const Foam& F, const std::vector<Star>& S, const Grammar& G, co
     std::size_t pick = 0;
     while (pick + 1 < candidates.size() && w >= p[pick]) w -= p[pick], pick++;
     const auto& rule = candidates[pick];
-    // The event attached.
+    // The event attached, each consumed participant keyed with the state it carries in.
     const std::size_t v = present.size();
     std::vector<std::size_t> here = consumed;
     here.insert(here.end(), newcomers.begin(), newcomers.end());
     present.push_back(here), kind.push_back(F.vertex[P.example.at(rule)]), time.push_back(t);
-    for (auto x : consumed) states[x][v] = state[x];
+    for (auto x : consumed) states[x][v] = state_of(x);
     for (auto q : meets) meetings[q].push_back(v);
     for (auto q : opens) meetings[q].push_back(v), pair_alive[q] = 1;
     for (auto q : closing) pair_alive[q] = 0;
     for (auto x : newcomers) alive[x] = begun[x] = 1;
-    // What each participant carries out: the table's draw, or what it carried in; one that ends is gone, with its pairs.
-    for (std::size_t k = 0; k < here.size(); k++) {
-      const auto x = here[k];
+    // What the site's own states become; a participant that ends is gone, with its pairs.
+    for (std::size_t k = 0; k < consumed.size(); k++) {
+      const auto x = consumed[k];
       const std::size_t at = g.generic ? 0 : static_cast<std::size_t>(std::find(tpl.participants.begin(), tpl.participants.end(), x) - tpl.participants.begin());
       if (!g.generic && tpl.in[at] && !tpl.out[at]) {
         alive[x] = 0;
         for (auto q : pairs_of[x]) pair_alive[q] = 0;
         continue;
       }
-      const auto it = P.after.find({state[x], rule, g.generic ? places[0] : place_of(F, tpl, at)});
-      if (it == P.after.end()) continue;
-      std::size_t n = 0;
-      for (const auto& [st, cnt] : it->second) n += cnt;
-      auto r = rs.below(n);
-      for (const auto& [st, cnt] : it->second) {
-        if (r < cnt) {
-          state[x] = st;
-          break;
-        }
-        r -= cnt;
-      }
+      const auto before = carried[k], after = P.step(before, rule, places[k]);
+      if (after == before) continue;
+      held(x, before, -1), held(x, after, 1);
+      if (g.generic) own_g[i][x] = after;
+      else own_c[i][k] = after;
     }
     if (g.once) fired[i] = 1;
   }
